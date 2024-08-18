@@ -54,7 +54,7 @@
 #endif
 
 #define new                 RL_NEW_PROXY
-#define delete              RL_DELETE_PROXY
+#define Delete              RL_DELETE_PROXY
 #define malloc(sz)          rl::rl_malloc((sz), $)
 #define calloc(sz, cnt)     rl::rl_calloc((sz), (cnt), $)
 #define realloc(p, sz)      rl::rl_realloc((p), (sz), $)

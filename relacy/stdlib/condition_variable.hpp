@@ -278,11 +278,21 @@ public:
     }
 
     template<typename lock_t, typename pred_t>
+    bool wait(lock_t& lock, pred_t&& pred, bool is_timed, debug_info_param info)
+    {
+        check(info);
+        mutex_wrapper_impl<lock_t> w (lock);
+        return impl_->wait(w, (pred_t&&)pred, is_timed, info);
+    }
+
+#if 0
+    template<typename lock_t, typename pred_t>
     bool wait(mutex_wrapper const& lock, pred_wrapper const& pred, bool is_timed, debug_info_param info)
     {
         check(info);
         return impl_->wait(mutex_wrapper_impl<lock_t>(lock), pred_wrapper_impl<pred_t>(pred), is_timed, info);
     }
+#endif
 
 private:
     condvar_data* impl_;

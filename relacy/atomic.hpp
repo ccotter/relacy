@@ -44,7 +44,7 @@ public:
     {
     }
 
-    T load(memory_order mo = mo_seq_cst) const
+    T load(memory_order mo = mo_seq_cst) const noexcept
     {
         return var_.load(mo, info_);
     }
@@ -75,7 +75,7 @@ public:
     {
     }
 
-    void store(T value, memory_order mo = mo_seq_cst)
+    void store(T value, memory_order mo = mo_seq_cst) noexcept
     {
         this->var_.store(value, mo, this->info_);
     }
@@ -194,7 +194,8 @@ public:
         context& c = ctx();
         RL_VERIFY(false == c.invariant_executing);
         impl_ = c.atomic_ctor(this);
-        initialized_ = false;
+        //initialized_ = false;
+        initialized_ = true; // What is strong_init?
         value_ = T();
         already_failed_ = false;
 
@@ -223,7 +224,7 @@ public:
     }
 
     RL_INLINE
-    T load(memory_order mo, debug_info_param info) const
+    T load(memory_order mo, debug_info_param info) const noexcept
     {
         RL_VERIFY(mo_release != mo);
         RL_VERIFY(mo_acq_rel != mo);

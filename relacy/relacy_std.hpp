@@ -13,12 +13,108 @@
 #   pragma once
 #endif
 
+#include <syscall.h>
+#include <unistd.h>
+
+enum memory_order {
+    memory_order_relaxed,
+    memory_order_consume,
+    memory_order_acquire,
+    memory_order_release,
+    memory_order_acq_rel,
+    memory_order_seq_cst
+};
 
 #include "relacy.hpp"
 
-
 namespace std
 {
+
+    template <class T>
+    struct lock_guard {
+        T& mtx_;
+        rl::debug_info_param info_;
+        lock_guard(const lock_guard&) = delete;
+        lock_guard& operator=(const lock_guard&) = delete;
+        lock_guard(T& mtx, rl::debug_info_param info) : mtx_(mtx), info_(info) {
+            mtx_.lock(info_);
+        }
+        ~lock_guard() {
+            mtx_.unlock(info_);
+        }
+    };
+
+    template <class T>
+    struct unique_lock {
+        T& mtx_;
+        rl::debug_info_param info_;
+        bool locked_ = true;
+        unique_lock(const unique_lock&) = delete;
+        unique_lock& operator=(const unique_lock&) = delete;
+        unique_lock(T& mtx, rl::debug_info_param info) : mtx_(mtx), info_(info) {
+            mtx_.lock(info);
+        }
+        void lock(rl::debug_info_param info) {
+            mtx_.lock(info);
+            locked_ = true;
+        }
+        void unlock(rl::debug_info_param info) {
+            mtx_.unlock(info);
+            locked_ = false;
+        }
+        ~unique_lock() {
+            if (locked_)
+                mtx_.unlock(info_);
+        }
+
+        bool owns_lock() const noexcept { return locked_; }
+        operator bool() const noexcept { return locked_; }
+    };
+
+    struct thread_impl {
+        pthread_t handle;
+        std::function<void(void)> fn;
+    };
+    struct thread {
+        struct id {
+            bool operator==(const id&) const = default;
+            long id_;
+        };
+        static auto hardware_concurrency() { return 2; }
+
+        auto get_id() {
+            return id{};
+        }
+        template <class F> thread(F&& fn) {
+            impl_ = std::make_unique<thread_impl>();
+            impl_->fn = (F&&)fn;
+            pthread_create(&impl_->handle, NULL, thread_fn, impl_.get());
+        }
+        thread() {}
+
+        static void* thread_fn(void* data) {
+            thread_impl* self = (thread_impl*)data;
+            self->fn();
+            return NULL;
+        }
+
+        void join() {
+            if (impl_) {
+                void* ret;
+                pthread_join(impl_->handle, &ret);
+            }
+        }
+
+        std::unique_ptr<thread_impl> impl_;
+    };
+    namespace this_thread {
+        static auto get_id() { return thread::id{syscall(SYS_gettid)}; }
+        static void yield() { pthread_yield(); }
+
+        template <class T>
+        static void sleep_for(T) {}
+    }
+
     using rl::memory_order;
     using rl::mo_relaxed;
     using rl::mo_consume;

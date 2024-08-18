@@ -32,6 +32,13 @@ struct atomic_add_type
 };
 
 template<typename T>
+struct atomic_add_type<const T*>
+{
+    typedef ptrdiff_t type;
+    typedef const void* output_type;
+};
+
+template<typename T>
 struct atomic_add_type<T*>
 {
     typedef ptrdiff_t type;

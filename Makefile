@@ -1,13 +1,14 @@
 # User-customizable variables:
 CXX ?= c++
-CXXFLAGS ?=
+CXXFLAGS ?= -I stdexec/include -I stdexec/test -I/home/ccotter/git/bex/src/bex/bexsr -I /opt/bb/include -std=c++20 -I FAKE -g -O0 -ftemplate-backtrace-limit=0
+#CXXFLAGS ?= -I stdexec/include -I stdexec/test -std=c++20 -I FAKE -g -O0 -ftemplate-backtrace-limit=0 -fconcepts-diagnostics-depth=50
 DEPFLAGS ?= -MD -MF $(@).d -MP -MT $(@)
 build_dir = build
 
 .SECONDARY:
 
 example_programs = cli_ws_deque
-test_programs = ntest/ntest
+test_programs = ntest/ntest stdexec/stdexec
 
 example_exe_files = $(foreach name,$(example_programs),$(build_dir)/example/$(name)/$(name))
 test_exe_files = $(foreach name,$(test_programs),$(build_dir)/test/$(name))
