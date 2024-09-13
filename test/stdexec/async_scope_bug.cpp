@@ -5,6 +5,7 @@
 #include <exec/async_scope.hpp>
 #include <exec/static_thread_pool.hpp>
 #include <test_common/schedulers.hpp>
+#include <test_common/type_helpers.hpp>
 
 #include <chrono>
 #include <random>
@@ -23,36 +24,20 @@ struct async_scope_bug : rl::test_suite<async_scope_bug, 1>
 
     void thread(unsigned)
     {
-        async_scope scope;
+        exec::static_thread_pool ctx{1};
 
-        bool cancelled1{false};
-        bool cancelled2{false};
+        ex::scheduler auto sch = ctx.get_scheduler();
 
-        exec::static_thread_pool pool{2};
-        auto s = ex::schedule(pool.get_scheduler());
-
+        exec::async_scope scope;
+        std::atomic_bool produced{false};
+        ex::sender auto begin = ex::schedule(sch);
         {
-        ex::sender auto snd1 = scope.spawn_future(ex::on(
-            pool.get_scheduler(),
-            ex::just() //
-            | ex::let_stopped([&] {
-                cancelled1 = true;
-                return ex::just();
-                })));
-        (void) snd1;
-#if 0
-        ex::sender auto snd2 = scope.spawn_future(ex::on(
-            pool.get_scheduler(),
-            ex::just() //
-            | ex::let_stopped([&] {
-                cancelled2 = true;
-                return ex::just();
-                })));
-        (void) snd2;
-#endif
+            ex::sender auto ftr = scope.spawn_future(begin | stdexec::then([&]() { produced.store(true); }));
+            (void) ftr;
         }
-
-        ex::sync_wait(scope.on_empty());
+        stdexec::sync_wait(scope.on_empty() | stdexec::then([&]() {
+            RL_ASSERT(produced.load());
+        }));
     }
 };
 
