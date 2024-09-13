@@ -543,7 +543,8 @@ public:
 
     void lock_exclusive(debug_info_param info)
     {
-        check(info)->lock_exclusive(false, info);
+        auto* p = check(info);
+        p->lock_exclusive(false, info);
     }
 
     bool try_lock_exclusive(debug_info_param info)
