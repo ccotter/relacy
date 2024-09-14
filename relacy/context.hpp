@@ -30,7 +30,6 @@
 #include "context_bound_scheduler.hpp"
 
 
-
 namespace rl
 {
 
@@ -1277,6 +1276,16 @@ inline void operator delete (void* p) throw()
     else
         (::free)(p);
 }
+
+#ifdef __cpp_sized_deallocation
+inline void operator delete (void* p, size_t sz) noexcept
+{
+    if (rl::is_ctx())
+        rl::ctx().free(p);
+    else
+        (::free)(p);
+}
+#endif
 
 inline void operator delete [] (void* p) throw()
 {
