@@ -454,7 +454,7 @@ public:
     virtual void fiber_proc_impl(int thread_index)
     {
         thread_info_base* param = &threads_[thread_index];
-        debug_info info = $;
+        debug_info info = debug_info::without_stacktrace(__FUNCTION__, __FILE__, __LINE__);
         for (;;)
         {
             if (first_thread_)
@@ -472,6 +472,7 @@ public:
                 current_test_suite->invariant();
                 invariant_executing = false;
                 special_function_executing = false;
+                capture_stacktrace = true;
             }
 
 //std::cout << "thread " << param->index_ << " started" << std::endl;
@@ -503,6 +504,7 @@ public:
             }
             else if (thread_finish_result_last == res)
             {
+                capture_stacktrace = false;
                 special_function_executing = true;
                 invariant_executing = true;
                 current_test_suite->invariant();

@@ -97,6 +97,7 @@ namespace std
 
     using rl::lock_guard;
     using rl::unique_lock;
+    using rl::scoped_lock;
 }
 
 #endif

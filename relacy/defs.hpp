@@ -14,6 +14,9 @@
 #endif
 
 #include <source_location>
+#if __cplusplus >= 202302L
+#include <stacktrace>
+#endif
 
 namespace rl
 {
@@ -47,17 +50,52 @@ enum unpark_reason
     unpark_reason_spurious,
 };
 
+inline bool capture_stacktrace = false;
+
 struct debug_info
 {
     char const* func_;
     char const* file_;
     unsigned line_;
 
-    debug_info(char const* func = "", char const* file = "", unsigned line = 0) noexcept
+#if 0
+#if __cplusplus >= 202302L
+    std::stacktrace st_;
+#endif
+#endif
+
+#if 1
+#if __cplusplus >= 202302L
+    std::string st_;
+
+    static std::string get_stacktrace_string(std::stacktrace st) {
+        std::stringstream ss;
+        if (capture_stacktrace)
+            ss << st;
+        return ss.str();
+    }
+#endif
+#endif
+
+    debug_info(char const* func = "", char const* file = "", unsigned line = 0, bool with_stacktrace = true) noexcept
         : func_(func)
         , file_(file)
         , line_(line)
     {
+#if 0
+#if __cplusplus >= 202302L
+        st_ = std::stacktrace::current();
+#endif
+#endif
+#if 1
+#if __cplusplus >= 202302L
+        if (with_stacktrace) st_ = get_stacktrace_string(std::stacktrace::current());
+#endif
+#endif
+    }
+
+    static debug_info without_stacktrace(const char* func, const char* file, unsigned line) noexcept {
+        return debug_info(func, file, line, false);
     }
 
 #if __cplusplus >= 202002L
@@ -66,6 +104,9 @@ struct debug_info
         , file_(sl.file_name())
         , line_(sl.line())
     {
+#if __cplusplus >= 202302L
+        st_ = get_stacktrace_string(std::stacktrace::current());
+#endif
     }
 #endif
 

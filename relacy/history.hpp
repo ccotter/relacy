@@ -85,6 +85,9 @@ inline std::ostream& operator << (std::ostream& ss, debug_info_param info)
     ss << info.file_ << "(" << info.line_ << ") : ";
 #else
     ss << info.func_ << ", " << strip_path(info.file_) << "(" << info.line_ << ")";
+#if __cplusplus >= 202302L
+    ss << " BACKTRACE[[\n" << info.st_ << "]]\n";
+#endif
 #endif
     return ss;
 }

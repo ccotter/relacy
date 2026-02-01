@@ -21,6 +21,8 @@
 #include "waitset.hpp"
 #include "rmw.hpp"
 
+void GDBME() {
+}
 
 namespace rl
 {
@@ -452,6 +454,7 @@ public:
     unpark_reason wait(context& c, bool is_timed, bool allow_spurious_wakeup, debug_info_param info)
     {
         sign_.check(info);
+        printf("waiting2 ...\n");
         return c.threadx_->atomic_wait(impl_, is_timed, allow_spurious_wakeup, info);
     }
 
@@ -466,6 +469,9 @@ public:
     {
         context& c = ctx();
         sign_.check(info);
+
+        int spurious_wakeups = 0;
+        constexpr int spurious_wakeup_limit = 10;
         
         for (;;)
         {
@@ -486,7 +492,13 @@ public:
             
             // Value still matches expected, so park (this may spuriously wake)
             // Park allows scheduling and may wake spuriously or due to notify
-            const_cast<generic_atomic*>(this)->wait(c, false, true, info);
+            bool allow_spurious_wakeup = spurious_wakeups < spurious_wakeup_limit;
+            printf("before wait ... cur val=%d allow=%d\n", current, allow_spurious_wakeup);
+            if (!allow_spurious_wakeup) GDBME();
+            auto r = const_cast<generic_atomic*>(this)->wait(c, false, allow_spurious_wakeup, info);
+            if (r == unpark_reason_spurious)
+                ++spurious_wakeups;
+            printf("waiting ... cur val=%d r=%d allow=%d\n", current, r, allow_spurious_wakeup);
             
             // After waking (spurious or real), loop back to check again
         }
@@ -499,6 +511,7 @@ public:
         c.atomic_thread_fence_seq_cst();
         
         // Wake one waiting thread from the waitset
+        printf("waking...\n");
         this->wake(c, 1, info);
     }
 
@@ -508,6 +521,7 @@ public:
         c.sched();
         
         // Wake all waiting threads from the waitset
+        printf("waking...\n");
         this->wake(c, thread_id_t(-1), info);
     }
 #endif
@@ -676,9 +690,16 @@ class atomic : public generic_atomic<T, false>
 #endif
 {
 public:
-    atomic() noexcept = default;
 
-    /*explicit*/ atomic(T value) noexcept (std::is_nothrow_default_constructible<T>::value)
+#if __cplusplus >= 202002L
+#define RL_ATOMIC_CONSTEXPR constexpr
+#else
+#define RL_ATOMIC_CONSTEXPR
+#endif
+
+    RL_ATOMIC_CONSTEXPR atomic() noexcept = default;
+
+    /*explicit*/ RL_ATOMIC_CONSTEXPR  atomic(T value) noexcept (std::is_nothrow_default_constructible<T>::value)
     {
         this->store(value, mo_relaxed, $);
     }

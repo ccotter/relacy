@@ -26,6 +26,10 @@
 namespace rl
 {
 
+// Tag types for lock constructors
+struct adopt_lock_t {};
+inline constexpr adopt_lock_t adopt_lock;
+
 template <class T>
 struct lock_guard {
     T& mtx_;
@@ -65,6 +69,78 @@ struct unique_lock {
 
     bool owns_lock() const noexcept { return locked_; }
     operator bool() const noexcept { return locked_; }
+};
+
+// Helper for invoking std::lock on a tuple of mutexes
+namespace impl {
+
+template <typename... MutexTypes, std::size_t... Is>
+void lock_mutexes(std::tuple<MutexTypes...>& mtxs, std::index_sequence<Is...>,
+                    rl::debug_info_param info) {
+    if constexpr (sizeof...(MutexTypes) == 0) {
+        // No mutexes to lock
+    } else if constexpr (sizeof...(MutexTypes) == 1) {
+        // Single mutex - call lock() directly
+        std::get<0>(mtxs).lock(info);
+    } else {
+        // Multiple mutexes - use deadlock avoidance algorithm
+        // This is simplified; a full implementation would need std::lock support
+        (std::get<Is>(mtxs).lock(info), ...);
+    }
+}
+
+template <typename... MutexTypes, std::size_t... Is>
+void unlock_mutexes(std::tuple<MutexTypes...>& mtxs, std::index_sequence<Is...>,
+                    rl::debug_info_param info) {
+    // Unlock in reverse order to match lock order
+    (..., std::get<Is>(mtxs).unlock(info));
+}
+
+} // namespace
+
+// scoped_lock: RAII-style wrapper for acquiring ownership of zero or more mutexes
+template <typename... MutexTypes>
+class scoped_lock : nocopy<> {
+public:
+    // Conditionally define mutex_type only when sizeof...(MutexTypes) == 1
+    template <bool Cond = (sizeof...(MutexTypes) == 1)>
+    using mutex_type = typename std::enable_if<Cond, typename std::tuple_element<0, std::tuple<MutexTypes...>>::type>::type;
+
+private:
+    std::tuple<MutexTypes&...> mtxs_;
+    rl::debug_info info_;
+
+public:
+    // Constructor 1: Acquires ownership of the given mutexes
+    explicit scoped_lock(MutexTypes&... mtxs)
+        : mtxs_(mtxs...), info_($) {
+        impl::lock_mutexes(mtxs_, std::index_sequence_for<MutexTypes...>{}, info_);
+    }
+
+    // Constructor 2: Adopts ownership without locking
+    scoped_lock(adopt_lock_t, MutexTypes&... mtxs)
+        : mtxs_(mtxs...), info_($) {
+        // Mutexes are already locked; do nothing
+    }
+
+    // Destructor: Releases ownership by unlocking all mutexes
+    ~scoped_lock() {
+        impl::unlock_mutexes(mtxs_, std::index_sequence_for<MutexTypes...>{}, info_);
+    }
+
+    // Delete copy operations
+    scoped_lock(const scoped_lock&) = delete;
+    scoped_lock& operator=(const scoped_lock&) = delete;
+};
+
+// Specialization for empty scoped_lock (zero mutexes)
+template <>
+class scoped_lock<> : nocopy<> {
+public:
+    explicit scoped_lock(rl::debug_info_param info DEFAULTED_DEBUG_INFO) {}
+    scoped_lock(adopt_lock_t, rl::debug_info_param info DEFAULTED_DEBUG_INFO) {}
+    scoped_lock(const scoped_lock&) = delete;
+    scoped_lock& operator=(const scoped_lock&) = delete;
 };
 
 struct generic_mutex_data : nocopy<>
