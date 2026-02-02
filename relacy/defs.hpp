@@ -51,6 +51,9 @@ enum unpark_reason
 };
 
 inline bool capture_stacktrace = false;
+inline int SKIP_ALLOC = 0;
+
+static const bool ENABLE_ST = getenv("ENABLE_ST") != nullptr;
 
 struct debug_info
 {
@@ -58,15 +61,13 @@ struct debug_info
     char const* file_;
     unsigned line_;
 
-#if 0
-#if __cplusplus >= 202302L
-    std::stacktrace st_;
-#endif
-#endif
+#define USE_ST_TYPE 0
 
-#if 1
 #if __cplusplus >= 202302L
-    std::string st_;
+#if USE_ST_TYPE
+    std::stacktrace st_;
+#else
+    std::optional<std::string> st_;
 
     static std::string get_stacktrace_string(std::stacktrace st) {
         std::stringstream ss;
@@ -82,15 +83,14 @@ struct debug_info
         , file_(file)
         , line_(line)
     {
-#if 0
 #if __cplusplus >= 202302L
-        st_ = std::stacktrace::current();
+        ++SKIP_ALLOC;
+#if USE_ST_TYPE
+        if (ENABLE_ST && with_stacktrace && capture_stacktrace) st_ = std::stacktrace::current();
+#else
+        if (ENABLE_ST && with_stacktrace) st_ = get_stacktrace_string(std::stacktrace::current());
 #endif
-#endif
-#if 1
-#if __cplusplus >= 202302L
-        if (with_stacktrace) st_ = get_stacktrace_string(std::stacktrace::current());
-#endif
+        --SKIP_ALLOC;
 #endif
     }
 
@@ -99,16 +99,28 @@ struct debug_info
     }
 
 #if __cplusplus >= 202002L
-    debug_info(std::source_location sl) noexcept
+    debug_info(std::source_location sl, bool with_stacktrace = true) noexcept
         : func_(sl.function_name())
         , file_(sl.file_name())
         , line_(sl.line())
     {
 #if __cplusplus >= 202302L
-        st_ = get_stacktrace_string(std::stacktrace::current());
+        ++SKIP_ALLOC;
+#if USE_ST_TYPE
+        if (ENABLE_ST && capture_stacktrace && with_stacktrace) st_ = std::stacktrace::current();
+#else
+        if (ENABLE_ST && capture_stacktrace && with_stacktrace) st_ = get_stacktrace_string(std::stacktrace::current());
+#endif
+        --SKIP_ALLOC;
 #endif
     }
 #endif
+
+    ~debug_info() {
+        ++SKIP_ALLOC;
+        st_.reset();
+        --SKIP_ALLOC;
+    }
 
 };
 

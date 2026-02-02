@@ -29,7 +29,7 @@
 #include "full_search_scheduler.hpp"
 #include "context_bound_scheduler.hpp"
 
-
+static void GDBME3() {}
 
 namespace rl
 {
@@ -193,6 +193,7 @@ public:
         , start_iteration_(1)
         , sched_(params, sctx, dynamic_thread_count)
         , sctx_(sctx)
+        , last_info_(std::source_location::current(), false)
     {
         this->context::seq_cst_fence_order_ = this->seq_cst_fence_order_;
 
@@ -353,7 +354,10 @@ public:
         
         disable_alloc_ += 1;
         debug_info const& info = last_info_;
-        RL_HIST_CTX(memory_free_event) {p, false} RL_HIST_END();
+        if (!SKIP_ALLOC) {
+            GDBME3();
+            RL_HIST_CTX(memory_free_event) {p, false} RL_HIST_END();
+        }
 #ifndef RL_GC
         bool const defer = (0 == sched_.rand(this->is_random_sched() ? 4 : 2, sched_type_mem_realloc));
 #else

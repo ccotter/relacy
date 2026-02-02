@@ -471,7 +471,7 @@ public:
         sign_.check(info);
 
         int spurious_wakeups = 0;
-        constexpr int spurious_wakeup_limit = 10;
+        constexpr int spurious_wakeup_limit = 2;
         
         for (;;)
         {
