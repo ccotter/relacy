@@ -23,6 +23,9 @@ See https://github.com/dvyukov/relacy/blob/master/README.md#overriding-std-types
 
 #include "relacy.hpp"
 
+#if __cplusplus >= 201703L
+#define __cpp_lib_shared_mutex 201505L
+#endif
 
 namespace std
 {
@@ -94,6 +97,10 @@ namespace std
     using rl::recursive_mutex;
     using rl::condition_variable;
     using rl::condition_variable_any;
+
+#ifdef __cpp_lib_shared_mutex
+    using rl::shared_mutex;
+#endif
 
     using rl::lock_guard;
     using rl::unique_lock;

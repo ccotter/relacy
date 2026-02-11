@@ -65,6 +65,7 @@ if(RELACY_BUILD_TESTS)
     add_relacy_test(debug_info test/debug_info.cpp)
     add_relacy_test(defaulted_debug_info test/defaulted_debug_info.cpp)
     add_relacy_test(new_delete test/new_delete.cpp)
+    add_relacy_test(mutex_test test/mutex.cpp)
     
     file(GLOB_RECURSE ntest_sources "test/ntest/*.cpp")
     if(ntest_sources)

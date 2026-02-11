@@ -8,6 +8,7 @@
 
 //#define RL_MSVC_OUTPUT
 
+#include "test_runner.hpp"
 
 #include "memory_order.hpp"
 #include "fence.hpp"
@@ -157,7 +158,7 @@ public:
         assert(owner == -1 && recursion_count == 0);
         sema.deinit($);
     }
-    
+
     void lock(rl::debug_info_param info)
     {
         rl::context& c = rl::ctx();
@@ -267,7 +268,7 @@ public:
     {
         CloseHandle(mtx);
     }
-    
+
     void lock(rl::debug_info_param info)
     {
         rl::rl_WaitForSingleObject(mtx, INFINITE, info);
@@ -379,7 +380,7 @@ int main()
     //simulate<my_test>();
     //if (rand() <= RAND_MAX) return 0;
 
-    rl::simulate_f tests[] = 
+    rl::simulate_f tests[] =
     {
 #if 1
         &rl::simulate<test_FlushProcessWriteBuffers>,
@@ -391,12 +392,9 @@ int main()
 
         // memory model
         &rl::simulate<test_pthread_thread>,
-        &rl::simulate<test_pthread_mutex>,
-        &rl::simulate<test_pthread_rwlock>,
-        &rl::simulate<test_pthread_condvar>,
         &rl::simulate<test_pthread_condvar2>,
         &rl::simulate<test_pthread_sem>,
-        
+
         &rl::simulate<coherent_read_read_test>,
         &rl::simulate<order_relaxed_test<0> >,
         &rl::simulate<order_relaxed_test<1> >,
@@ -415,7 +413,6 @@ int main()
         &rl::simulate<test_win_thread>,
         &rl::simulate<test_win_mutex>,
         &rl::simulate<test_win_cs>,
-        &rl::simulate<test_win_condvar>,
         &rl::simulate<test_win_condvar_srw>,
         &rl::simulate<test_win_sem>,
         &rl::simulate<test_win_event>,
@@ -432,7 +429,7 @@ int main()
         &rl::simulate<fence_synch_test<0, 1> >,
         &rl::simulate<fence_synch_test<1, 1> >,
         &rl::simulate<fence_synch_test<2, 1> >,
-  
+
         &rl::simulate<two_fence_synch_test>,
         &rl::simulate<seq_cst_fence_test<0> >,
         &rl::simulate<seq_cst_fence_test<1> >,
@@ -469,7 +466,7 @@ int main()
         &rl::simulate<test_mutex_leak>,
         &rl::simulate<test_mutex>,
         &rl::simulate<test_mutex_try_lock>,
-	
+
         // futex
         &rl::simulate<test_futex>,
         &rl::simulate<test_futex_deadlock>,
@@ -513,48 +510,19 @@ int main()
         &rl::simulate<dyn_thread_visibility_test>,
 #endif
     };
+    run_tests_with_scheduler(tests, {rl::sched_random, rl::sched_bound, rl::sched_full});
 
-    for (size_t sched = 0; sched != rl::sched_count; ++sched)
-    {
-        std::cout << format((rl::scheduler_type_e)sched) << " tests:" << std::endl;
+    // TODO: these tests do not work under sched_full, but should. For now,
+    // we run them without sched_full.
+    rl::simulate_f non_full_sched_tests[] = {
+        &rl::simulate<test_win_condvar>,
+        &rl::simulate<test_pthread_mutex>,
+        &rl::simulate<test_pthread_rwlock>,
+        &rl::simulate<test_pthread_condvar>
+    };
+    run_tests_with_scheduler(non_full_sched_tests, {rl::sched_random, rl::sched_bound});
 
-        for (size_t i = 0; i != sizeof(tests)/sizeof(*tests); ++i)
-        {
-            //!!! make it work under sched_full
-            if (sched == rl::sched_full
-                && (tests[i] == (rl::simulate_f)&rl::simulate<test_pthread_condvar>
-                    || tests[i] == (rl::simulate_f)&rl::simulate<test_win_condvar>
-                    || tests[i] == (rl::simulate_f)&rl::simulate<test_pthread_rwlock>
-                    || tests[i] == (rl::simulate_f)&rl::simulate<test_pthread_mutex>))
-                continue;
-
-            rl::ostringstream stream;
-            rl::test_params params;
-            params.search_type = (rl::scheduler_type_e)sched;
-            params.iteration_count =
-                (params.test_result == rl::test_result_success ? 100000 : 500);
-            params.output_stream = &stream;
-            params.progress_stream = &stream;
-            params.context_bound = 2;
-            params.execution_depth_limit = 500;
-
-            if (false == tests[i](params))
-            {
-                std::cout << std::endl;
-                std::cout << "FAILED" << std::endl;
-                std::cout << stream.str();
-                std::cout << std::endl;
-                return 1;
-            }
-            else
-            {
-                std::cout << params.test_name << "...OK" << std::endl;
-            }
-        }
-        std::cout << std::endl;
-    }
-
-    rl::simulate_f scheduler_tests[] = 
+    rl::simulate_f scheduler_tests[] =
     {
         &rl::simulate<livelock_test>,
         &rl::simulate<yield_livelock_test>,

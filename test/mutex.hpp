@@ -217,5 +217,3 @@ struct test_mutex_leak : rl::test_suite<test_mutex_leak, 1, rl::test_result_reso
         delete [] p;
     }
 };
-
-

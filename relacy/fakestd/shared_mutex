@@ -1,0 +1,6 @@
+// -*-C++-*-
+
+#ifndef INCLUDED_RL_SHARED_MUTEX
+#define INCLUDED_RL_SHARED_MUTEX
+
+#endif

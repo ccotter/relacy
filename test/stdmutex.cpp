@@ -1,5 +1,7 @@
 #include "../relacy/relacy_std.hpp"
+
 #include <mutex>
+#include <shared_mutex>
 
 struct unique_lock_basic : rl::test_suite<unique_lock_basic, 4> {
     std::mutex mtx;
@@ -33,6 +35,25 @@ struct scoped_lock_basic : rl::test_suite<scoped_lock_basic, 4> {
 
 #endif // __cpp_lib_scoped_lock
 
+#ifdef __cpp_lib_shared_mutex
+
+struct shared_mutex_basic : rl::test_suite<shared_mutex_basic, 1>
+{
+    std::shared_mutex mtx;
+
+    void thread(unsigned)
+    {
+          while (!mtx.try_lock($))
+            ; // empty
+          mtx.unlock($);
+          while (!mtx.try_lock_shared($))
+            ; // empty
+          mtx.unlock_shared($);
+    }
+};
+
+#endif // __cpp_lib_shared_mutex
+
 int main()
 {
     rl::test_params p;
@@ -40,10 +61,15 @@ int main()
 
 #define CHECK(x) if (!(x)) { std::cout << "Test failed at line " << __LINE__ << std::endl; return 1; }
 
-    CHECK(rl::simulate<unique_lock_basic>());
+    CHECK(rl::simulate<unique_lock_basic>(p));
 #ifdef __cpp_lib_scoped_lock
-    CHECK(rl::simulate<scoped_lock_basic>());
+    CHECK(rl::simulate<scoped_lock_basic>(p));
 #endif // __cpp_lib_scoped_lock
+
+#ifdef __cpp_lib_shared_mutex
+    CHECK(rl::simulate<shared_mutex_basic>(p));
+#endif
+
     std::cout << "All stdmutex.cpp tests passed!" << std::endl;
     return 0;
 }

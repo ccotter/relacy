@@ -785,6 +785,54 @@ struct mutex_tag_std_recursive;
 typedef std_generic_mutex<mutex_tag_std_recursive, true> recursive_mutex;
 
 
+struct shared_mutex_tag;
+class shared_mutex : generic_mutex<shared_mutex_tag>, nocopy<>
+{
+public:
+    shared_mutex()
+    {
+        generic_mutex<shared_mutex_tag>::init(true, false, false, true, $);
+    }
+
+    ~shared_mutex()
+    {
+        generic_mutex<shared_mutex_tag>::deinit($);
+    }
+
+    // Exclusive locking
+    void lock(debug_info_param info DEFAULTED_DEBUG_INFO)
+    {
+        generic_mutex<shared_mutex_tag>::lock_exclusive(info);
+    }
+
+    bool try_lock(debug_info_param info DEFAULTED_DEBUG_INFO)
+    {
+        return generic_mutex<shared_mutex_tag>::try_lock_exclusive(info);
+    }
+
+    void unlock(debug_info_param info DEFAULTED_DEBUG_INFO)
+    {
+        generic_mutex<shared_mutex_tag>::unlock_exclusive(info);
+    }
+
+    // Shared locking
+    void lock_shared(debug_info_param info DEFAULTED_DEBUG_INFO)
+    {
+        generic_mutex<shared_mutex_tag>::lock_shared(info);
+    }
+
+    bool try_lock_shared(debug_info_param info DEFAULTED_DEBUG_INFO)
+    {
+        return generic_mutex<shared_mutex_tag>::try_lock_shared(info);
+    }
+
+    void unlock_shared(debug_info_param info DEFAULTED_DEBUG_INFO)
+    {
+        generic_mutex<shared_mutex_tag>::unlock_shared(info);
+    }
+};
+
+
 }
 
 #endif
