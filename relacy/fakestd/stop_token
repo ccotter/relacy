@@ -3,4 +3,189 @@
 #ifndef INCLUDED_RL_STOP_TOKEN
 #define INCLUDED_RL_STOP_TOKEN
 
+#include <memory>
+#include <utility>
+#include <cstdint>
+#include <vector>
+#include <functional>
+#include <exception>
+
+namespace std {
+
+// Forward declarations
+class stop_token;
+class stop_source;
+template <class Callback>
+class stop_callback;
+
+// stop_token class
+class stop_token {
+ public:
+  // Constructors
+  stop_token() noexcept = default;
+  stop_token(const stop_token& other) noexcept = default;
+  stop_token(stop_token&& other) noexcept = default;
+
+  // Assignment operators
+  stop_token& operator=(const stop_token& other) noexcept = default;
+  stop_token& operator=(stop_token&& other) noexcept = default;
+
+  // Destructor
+  ~stop_token() = default;
+
+  // Observers
+  [[nodiscard]] bool stop_requested() const noexcept {
+    return __state_ != nullptr && __state_->__stop_requested_;
+  }
+
+  [[nodiscard]] bool stop_possible() const noexcept {
+    return __state_ != nullptr;
+  }
+
+  // Comparison operators
+  bool operator==(const stop_token& other) const noexcept {
+    return __state_ == other.__state_;
+  }
+
+  bool operator!=(const stop_token& other) const noexcept {
+    return !(*this == other);
+  }
+
+  // Swap
+  void swap(stop_token& other) noexcept {
+    std::swap(__state_, other.__state_);
+  }
+
+ private:
+  friend class stop_source;
+  template <class>
+  friend class stop_callback;
+
+  struct __stop_state {
+    bool __stop_requested_ = false;
+    std::size_t __ref_count_ = 2;  // One for stop_source, one for stop_token
+    std::vector<std::function<void()>> __callbacks_;
+  };
+
+  explicit stop_token(std::shared_ptr<__stop_state> state) noexcept
+    : __state_(std::move(state)) {
+  }
+
+  std::shared_ptr<__stop_state> __state_;
+};
+
+// stop_source class
+class stop_source {
+ public:
+  // Constructors
+  stop_source() noexcept
+    : __state_(std::make_shared<stop_token::__stop_state>()) {
+  }
+
+  stop_source(const stop_source& other) = delete;
+  stop_source(stop_source&& other) noexcept = default;
+
+  // Assignment operators
+  stop_source& operator=(const stop_source& other) = delete;
+  stop_source& operator=(stop_source&& other) noexcept = default;
+
+  // Destructor
+  ~stop_source() = default;
+
+  // Modifiers
+  [[nodiscard]] bool request_stop() noexcept {
+    if (__state_) {
+      if (!__state_->__stop_requested_) {
+        __state_->__stop_requested_ = true;
+        // Invoke all registered callbacks
+        auto callbacks = __state_->__callbacks_;  // Copy to avoid issues
+        for (auto& cb : callbacks) {
+          try {
+            cb();
+          } catch (...) {
+            std::terminate();
+          }
+        }
+        __state_->__callbacks_.clear();
+        return true;
+      }
+    }
+    return false;
+  }
+
+  void swap(stop_source& other) noexcept {
+    std::swap(__state_, other.__state_);
+  }
+
+  // Observers
+  stop_token get_token() const noexcept {
+    return stop_token(__state_);
+  }
+
+  [[nodiscard]] bool stop_requested() const noexcept {
+    return __state_ != nullptr && __state_->__stop_requested_;
+  }
+
+  [[nodiscard]] bool stop_possible() const noexcept {
+    return __state_ != nullptr;
+  }
+
+ private:
+  std::shared_ptr<stop_token::__stop_state> __state_;
+};
+
+// stop_callback class template
+template <class Callback>
+class stop_callback {
+ public:
+  using callback_type = Callback;
+
+  template <class C>
+  explicit stop_callback(stop_token token, C&& cb)
+    : __token_(token)
+    , __callback_(std::make_shared<Callback>(std::forward<C>(cb)))
+  {
+    if (__token_.stop_requested()) {
+      // Stop already requested, invoke immediately in constructor
+      try {
+        (*__callback_)();
+      } catch (...) {
+        std::terminate();
+      }
+    } else if (__token_.stop_possible()) {
+      // Register callback with the state
+      auto cb_ptr = __callback_;
+      __token_.__state_->__callbacks_.push_back([cb_ptr]() noexcept {
+        try {
+          (*cb_ptr)();
+        } catch (...) {
+          std::terminate();
+        }
+      });
+    }
+  }
+
+  ~stop_callback() = default;
+
+  stop_callback(const stop_callback&) = delete;
+  stop_callback& operator=(const stop_callback&) = delete;
+  stop_callback(stop_callback&&) = delete;
+  stop_callback& operator=(stop_callback&&) = delete;
+
+ private:
+  stop_token __token_;
+  std::shared_ptr<Callback> __callback_;
+};
+
+// Free function swap
+inline void swap(stop_token& lhs, stop_token& rhs) noexcept {
+  lhs.swap(rhs);
+}
+
+inline void swap(stop_source& lhs, stop_source& rhs) noexcept {
+  lhs.swap(rhs);
+}
+
+}  // namespace std
+
 #endif
